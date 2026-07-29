@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Counterpoints</title>
+<!--
+  counterpoints-creator view bundle. Self-contained (no external deps, no CDN)
+  so it runs in the host's sandboxed, opaque-origin iframe. The host posts the
+  artifact in via postMessage; this view dispatches on schema_id and renders.
+  Display-only.
+
+  Versioning lives here: keep a renderer for every schema_id this creator has
+  ever emitted. Today that is just counterpoints.v1.
+-->
+<style>
+  :root {
+    --bg: #ffffff; --fg: #18181b; --muted: #71717a; --card: #fafafa;
+    --border: #e4e4e7; --accent: #4f46e5;
+    --a: #2563eb; --a-bg: #eff6ff; --a-border: #bfdbfe;
+    --b: #d97706; --b-bg: #fffbeb; --b-border: #fde68a;
+    --syn-bg: #fafafa;
+  }
+  :root[data-theme="dark"] {
+    --bg: #18181b; --fg: #fafafa; --muted: #a1a1aa; --card: #27272a;
+    --border: #3f3f46; --accent: #6366f1;
+    --a: #60a5fa; --a-bg: #1e293b; --a-border: #1d4ed8;
+    --b: #fbbf24; --b-bg: #292524; --b-border: #b45309;
+    --syn-bg: #27272a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px; background: var(--bg); color: var(--fg);
+    font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }
+  h1.title { font-size: 20px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); font-size: 13px; margin: 0 0 20px; }
+  .issue { margin: 0 0 28px; }
+  .issue h2 { font-size: 16px; margin: 0 0 4px; }
+  .context { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .sides { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 8px; }
+  .side-label { font-weight: 600; font-size: 13px; padding: 4px 10px; border-radius: 999px; display: inline-block; }
+  .side-label.a { color: var(--a); background: var(--a-bg); border: 1px solid var(--a-border); }
+  .side-label.b { color: var(--b); background: var(--b-bg); border: 1px solid var(--b-border); justify-self: end; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 14px; }
+  .card { border-radius: 10px; padding: 10px 12px; border: 1px solid var(--border); background: var(--card); }
+  .card.a { background: var(--a-bg); border-color: var(--a-border); }
+  .card.b { background: var(--b-bg); border-color: var(--b-border); grid-column: 2; }
+  .card.resp { grid-column: 1; border-style: dashed; }
+  .card .tag { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin: 0 0 4px; }
+  .card.a .tag, .card.resp .tag { color: var(--a); }
+  .card.b .tag { color: var(--b); }
+  .card .ev { color: var(--muted); font-size: 12.5px; margin: 6px 0 0; }
+  .synthesis { border-left: 3px solid var(--accent); background: var(--syn-bg); border-radius: 0 10px 10px 0; padding: 10px 12px; }
+  .synthesis .tag { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); margin: 0 0 4px; }
+  .empty { color: var(--muted); padding: 24px; text-align: center; }
+  @media (max-width: 560px) {
+    .pair, .sides { grid-template-columns: 1fr; }
+    .card.b, .card.resp { grid-column: 1; }
+    .side-label.b { justify-self: start; }
+  }
+</style>
+</head>
+<body>
+<div id="root"><div class="empty">Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  var root = document.getElementById("root");
+  var esc = function (s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  };
+
+  // ---- per-schema renderers (keep old versions forever) --------------------
+  var renderers = {
+    "counterpoints.v1": renderCounterpointsV1,
+  };
+
+  function card(cls, tag, text, evidence) {
+    var html = '<div class="card ' + cls + '">' +
+               '<div class="tag">' + esc(tag) + '</div>' +
+               '<div>' + esc(text) + '</div>';
+    if (evidence) html += '<div class="ev">' + esc(evidence) + '</div>';
+    return html + '</div>';
+  }
+
+  function renderIssue(issue, n) {
+    var sideA = issue.side_a || "For";
+    var sideB = issue.side_b || "Against";
+    var html = '<section class="issue">';
+    html += '<h2>' + n + '. ' + esc(issue.question || "Issue") + '</h2>';
+    if (issue.context) html += '<p class="context">' + esc(issue.context) + '</p>';
+    html += '<div class="sides">' +
+            '<span class="side-label a">' + esc(sideA) + '</span>' +
+            '<span class="side-label b">' + esc(sideB) + '</span></div>';
+    var pairs = issue.pairs || [];
+    for (var i = 0; i < pairs.length; i++) {
+      var p = pairs[i];
+      html += '<div class="pair">';
+      html += card("a", sideA, p.point, p.point_evidence);
+      html += card("b", sideB, p.counterpoint, p.counterpoint_evidence);
+      if (p.response) html += card("resp", sideA + " responds", p.response, null);
+      html += '</div>';
+    }
+    if (issue.synthesis) {
+      html += '<div class="synthesis"><div class="tag">Synthesis</div><div>' +
+              esc(issue.synthesis) + '</div></div>';
+    }
+    return html + '</section>';
+  }
+
+  function renderCounterpointsV1(data) {
+    var title = (data && data.title) || "Counterpoints";
+    var html =
+      '<h1 class="title">' + esc(title) + '</h1>' +
+      (data && data.description ? '<p class="subtitle">' + esc(data.description) + '</p>' : '');
+    var issues = (data && data.issues) || [];
+    if (!issues.length) {
+      root.innerHTML = html + '<div class="empty">No debates in this artifact.</div>';
+      return;
+    }
+    for (var i = 0; i < issues.length; i++) html += renderIssue(issues[i], i + 1);
+    root.innerHTML = html;
+  }
+
+  // ---- host handshake ------------------------------------------------------
+  function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
+  }
+
+  function resolveTheme(msg) {
+    var t = (msg.config && msg.config.theme) || (msg.data && msg.data.theme) || "auto";
+    if (t === "auto") t = msg.theme === "dark" ? "dark" : "light";
+    return t;
+  }
+
+  function onArtifact(msg) {
+    applyTheme(resolveTheme(msg));
+    var r = renderers[msg.schema_id];
+    if (!r) {
+      root.innerHTML = '<div class="empty">No renderer for "' + esc(msg.schema_id) + '".</div>';
+      return;
+    }
+    try { r(msg.data || {}); }
+    catch (e) { root.innerHTML = '<div class="empty">Failed to render this artifact.</div>'; }
+  }
+
+  window.addEventListener("message", function (e) {
+    var d = e.data;
+    if (d && d.type === "open-notebook:artifact") onArtifact(d);
+  });
+  try { parent.postMessage({ type: "open-notebook:ready" }, "*"); } catch (e) {}
+})();
+</script>
+</body>
+</html>
