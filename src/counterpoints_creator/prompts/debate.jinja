@@ -1,0 +1,52 @@
+You are an expert at steel-manning both sides of a contested issue. Using ONLY the
+research content below (plus common background knowledge where the content is
+silent), write the strongest honest case for each side of this issue.
+{% if instructions %}
+Additional instructions from the user (follow these closely):
+{{ instructions }}
+{% endif %}
+
+Issue: {{ question }}
+{% if context %}Context: {{ context }}{% endif %}
+Side A — "{{ side_a }}"
+Side B — "{{ side_b }}"
+
+Generate exactly {{ points_per_issue }} matched argument pairs. Each pair is one
+exchange:
+- `point`: side A's claim, stated affirmatively in 1–2 sentences.
+- `point_evidence`: the supporting evidence/reasoning, drawn from the content
+  where possible (1–2 sentences).
+- `counterpoint`: side B's strongest DIRECT rebuttal to that specific point —
+  not a generic objection (1–2 sentences).
+- `counterpoint_evidence`: the rebuttal's supporting evidence/reasoning (1–2 sentences).
+- `response`: side A's honest response to the counterpoint. Concede what should
+  be conceded; never strawman (1–2 sentences).
+
+Rules:
+- Both sides must be argued at full strength — a reader should not be able to
+  tell which side the author favors.
+- Each pair covers a DIFFERENT line of argument (empirical, practical, ethical,
+  economic, precedent, risk, …); no repetition.
+- Ground claims in the research content; do not fabricate statistics or quotes.
+{% if include_synthesis %}
+- `synthesis`: 2–4 neutral sentences naming the crux — where the sides actually
+  disagree (values? predictions? evidence?) and what evidence or outcome would
+  resolve it. Do NOT pick a winner.
+{% endif %}
+
+Return ONLY valid JSON (no prose, no markdown fences) matching exactly:
+{
+  "pairs": [
+    {
+      "point": "...",
+      "point_evidence": "...",
+      "counterpoint": "...",
+      "counterpoint_evidence": "...",
+      "response": "..."
+    }
+  ]{% if include_synthesis %},
+  "synthesis": "..."{% endif %}
+}
+
+Research content:
+{{ content }}
