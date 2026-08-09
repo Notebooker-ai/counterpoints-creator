@@ -100,6 +100,10 @@ class CounterpointsCreator(BaseCreator):
             ],
             icon="scale",
             view=CreatorView(entry="view/index.html"),
+            suggestion_hint=(
+                "which claims to challenge, which opposing perspectives to develop, "
+                "and where the real disagreement lies"
+            ),
         )
 
     async def generate(self, request: CreationRequest) -> CreationResult:
